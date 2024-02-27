@@ -1,0 +1,38 @@
+from azure.ai.textanalytics import TextAnalyticsClient
+from azure.core.credentials import AzureKeyCredential
+from azure.storage.blob import BlobServiceClient, BlobClient
+
+key = ["LANGUAGE_RESOURCE_KEY"]
+endpoint = "https://[LANGUAGE_RESOURCE_NAME].cognitiveservices.azure.com/"
+
+container_name = ['INPUT_DATA_CONTAINER_NAME']
+sink_container_name = ['SINK_DATA_CONTAINER_NAME']
+blob_service_client = BlobServiceClient.from_connection_string("DefaultEndpointsProtocol=https;AccountName=[STORAGE_ACCOUNT_NAME];AccountKey=[STORAGE_ACCOUNT_KEY];EndpointSuffix=core.windows.net")
+container_client = blob_service_client.get_container_client(container_name)
+sink_container_client = blob_service_client.get_container_client(sink_container_name)
+blob_list = container_client.list_blobs()
+documents = []
+
+def authenticate_client():
+    ta_credential = AzureKeyCredential(key)
+    text_analytics_client = TextAnalyticsClient(
+            endpoint=endpoint,
+            credential=ta_credential)
+    return text_analytics_client
+
+client = authenticate_client()
+
+for blob in blob_list:
+
+    blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob)
+    downloader = blob_client.download_blob(max_concurrency=1, encoding='UTF-8')
+    blob_text = downloader.readall()
+    blob_text = blob_text.replace('\r\n', '')
+    documents.append(blob_text)
+    response = client.recognize_pii_entities(documents, language="en", categories_filter=["Person", "Address"])
+    result = [doc for doc in response if not doc.is_error]
+    for doc in result:
+      # print(doc.redacted_text)
+      # print ('blob',blob.name)
+      sink_blob_client = blob_service_client.get_blob_client(container=sink_container_name, blob=blob.name)
+      sink_blob_client.upload_blob(doc.redacted_text)
