@@ -1,0 +1,100 @@
+def deidentify_cloud_storage(
+    project = ["YOUR_PROJECT_ID"],
+    input_gcs_bucket = ["INPUT_DATA_BUCKET_NAME"],
+    output_gcs_bucket = ["SINK_DATA_BUCKET_NAME"],
+    info_types = ['PERSON_NAME', 'STREET_ADDRESS', 'LOCATION'],
+    timeout: int = 1000,
+) -> None:
+    
+    # Instantiate a client.
+    dlp = google.cloud.dlp_v2.DlpServiceClient()
+
+    # Construct the configuration dictionary.
+    # Specify the type of info the inspection will look for.
+    # See https://cloud.google.com/dlp/docs/infotypes-reference for complete list of info types.
+    inspect_config = {"info_types": [{"name": info_type} for info_type in info_types]}
+
+    # Construct cloud_storage_options dictionary with the bucket's URL.
+    storage_config = {
+        "cloud_storage_options": {"file_set": {"url": f"gs://{input_gcs_bucket}"}}
+    }
+
+    # Specify the big query table to store the transformation details.
+    # big_query_table = {
+    #     "project_id": project,
+    #     "dataset_id": dataset_id,
+    #     "table_id": table_id,
+    # }
+
+    # Convert the project id into a full resource id.
+    parent = f"projects/{project}/locations/global"
+
+    # Construct Transformation Configuration with de-identify Templates used
+    # for transformation.
+    # transformation_config = {
+    #     "deidentify_template": f"{parent}/deidentifyTemplates/{deid_template_id}",
+    #     "structured_deidentify_template": f"{parent}/deidentifyTemplates/{structured_deid_template_id}",
+    #     "image_redact_template": f"{parent}/deidentifyTemplates/{image_redact_template_id}",
+    # }
+
+    # Tell the API where to send notification when the job is completed.
+    actions = [
+        {
+            "deidentify": {
+                "cloud_storage_output": f"gs://{output_gcs_bucket}",
+                "file_types_to_transform": ["TEXT_FILE"],
+            }
+        }
+    ]
+
+    # Construct the job definition.
+    inspect_job = {
+        "inspect_config": inspect_config,
+        "storage_config": storage_config,
+        "actions": actions,
+    }
+
+    # Call the API.
+    response = dlp.create_dlp_job(
+        request={
+            "parent": parent,
+            "inspect_job": inspect_job,
+        }
+    )
+
+    job_name = response.name
+    print(f"Inspection Job started : {job_name}")
+
+    # Waiting for the job to get completed.
+    job = dlp.get_dlp_job(request={"name": job_name})
+    # Since the sleep time is kept as 30s, number of calls would be timeout/30.
+    no_of_attempts = timeout // 30
+    while no_of_attempts != 0:
+        # Check if the job has completed.
+        if job.state == google.cloud.dlp_v2.DlpJob.JobState.DONE:
+            break
+        if job.state == google.cloud.dlp_v2.DlpJob.JobState.FAILED:
+            print("Job Failed, Please check the configuration.")
+            break
+
+        # Sleep for a short duration before checking the job status again.
+        time.sleep(30)
+        no_of_attempts -= 1
+
+        # Get DLP job status.
+        job = dlp.get_dlp_job(request={"name": job_name})
+
+    if job.state != google.cloud.dlp_v2.DlpJob.JobState.DONE:
+        print(f"Job did not complete within {timeout} minutes.")
+        return
+
+    # Print out the results.
+    print(f"Job name: {job.name}")
+    result = job.inspect_details.result
+    print(f"Processed Bytes: {result.processed_bytes}")
+    if result.info_type_stats:
+        for stats in result.info_type_stats:
+            print(f"Info type: {stats.info_type.name}")
+            print(f"Count: {stats.count}")
+    else:
+        print("No findings.")
