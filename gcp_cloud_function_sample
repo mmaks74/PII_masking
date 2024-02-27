@@ -1,3 +1,9 @@
+import time
+from typing import List
+import os
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"]= "credentials.json"
+
 def deidentify_cloud_storage(
     project = ["YOUR_PROJECT_ID"],
     input_gcs_bucket = ["INPUT_DATA_BUCKET_NAME"],
