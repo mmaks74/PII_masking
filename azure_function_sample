@@ -5,18 +5,15 @@ async def sample_recognize_pii_entities_async() -> None:
 	from azure.ai.textanalytics import TextAnalyticsClient
 	from azure.core.credentials import AzureKeyCredential
 	from azure.storage.blob import BlobServiceClient, BlobClient
-	key = "49645d5995c84b4287214ef65342474e"
-	endpoint = "https://dlp-testing1.cognitiveservices.azure.com/"
-	container_name = 'datasource'
-	sink_container_name = 'datasink'
-	blob_service_client = BlobServiceClient.from_connection_string("DefaultEndpointsProtocol=https;AccountName=dataprocessingtesting;AccountKey=aortquG6hivrl2UpGyqOWYasOnnpGzu63hnsNrPfMIb8dM5rY7O+HNE0lu7Tv+aMSsE8WDXbe6zE+AStybgt4Q==;EndpointSuffix=core.windows.net")
+	key = ["AZURE_LANGUAGE_KEY"]
+	endpoint = "https://["AZURE_LANGUAGE_ENDPOINT"].cognitiveservices.azure.com/"
+	container_name = ['YOUR SOURCE CONTAINER NAME']
+	sink_container_name = ['YOUR SINK CONTAINER NAME']
+	blob_service_client = BlobServiceClient.from_connection_string("DefaultEndpointsProtocol=https;AccountName=[YOUR Storage Account Name];AccountKey=[YOUR Storage Account KEY];EndpointSuffix=core.windows.net")
 	container_client = blob_service_client.get_container_client(container_name)
 	sink_container_client = blob_service_client.get_container_client(sink_container_name)
 	blob_list = container_client.list_blobs()
 	documents = []
-
-    endpoint = os.environ["AZURE_LANGUAGE_ENDPOINT"]
-	key = os.environ["AZURE_LANGUAGE_KEY"]
 
 	text_analytics_client = TextAnalyticsClient(endpoint=endpoint, credential=AzureKeyCredential(key)
 	    )
